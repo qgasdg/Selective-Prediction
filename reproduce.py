@@ -11,6 +11,7 @@ Usage
 """
 
 import argparse
+import os
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -22,7 +23,11 @@ from xgboost import XGBClassifier
 
 from src.preprocess import load_and_clean, engineer_features, split_data
 from src.models import get_baseline, SelectivePredictor
-from src.evaluate import evaluate_standard, threshold_sweep_table, print_sweep
+from src.evaluate import (
+    evaluate_standard, threshold_sweep_table, print_sweep,
+    plot_confidence_distribution, plot_confusion_matrices,
+)
+from src.eda import run_eda
 
 SEED = 42
 
@@ -51,10 +56,21 @@ def section(title: str):
     print(f'\n{bar}\n  {title}\n{bar}')
 
 
+RESULTS_DIR = 'results'
+
+
 def main(data_path: str, tau: float):
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(f'{RESULTS_DIR}/eda', exist_ok=True)
+
+    # ── EDA ───────────────────────────────────────────────────────────────────
+    section('EDA')
+    df_raw = load_and_clean(data_path)
+    run_eda(df_raw, out_dir=f'{RESULTS_DIR}/eda')
+
     # ── Data ──────────────────────────────────────────────────────────────────
     section('Data')
-    df = engineer_features(load_and_clean(data_path))
+    df = engineer_features(df_raw)
     X_train, X_val, X_test, y_train, y_val, y_test = split_data(df, random_state=SEED)
     y_test_np = y_test.values
 
@@ -141,7 +157,24 @@ def main(data_path: str, tau: float):
         print(f'  Accuracy : {acc_sp:.4f}  (on covered samples)')
         print(f'  Abstained: {1 - covered.mean():.1%}')
 
-    print('\nDone.')
+    # ── Plots ─────────────────────────────────────────────────────────────────
+    section('Plots')
+    for name, proba in [('Random Forest', rf_proba), ('XGBoost', xgb_proba)]:
+        safe_name = name.replace(' ', '_').lower()
+        plot_confidence_distribution(
+            y_test_np, proba, model_name=name, tau=tau,
+            save_path=f'{RESULTS_DIR}/{safe_name}_confidence.png',
+        )
+
+    cm_data = {
+        'Logistic Regression': (y_test_np, lr_pred),
+        'Random Forest':       (y_test_np, rf_pred),
+        'XGBoost':             (y_test_np, xgb_pred),
+    }
+    plot_confusion_matrices(cm_data, save_path=f'{RESULTS_DIR}/confusion_matrices.png')
+
+    print(f'\nAll outputs saved to {RESULTS_DIR}/')
+    print('Done.')
 
 
 if __name__ == '__main__':

@@ -11,6 +11,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+plt.rcParams['font.family'] = 'AppleGothic'
+plt.rcParams['axes.unicode_minus'] = False
 from sklearn.metrics import (
     accuracy_score, f1_score, roc_auc_score,
     precision_score, recall_score,
