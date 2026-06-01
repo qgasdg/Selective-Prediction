@@ -1,0 +1,14 @@
+# PDF files
+*.pdf
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+
+results/*
